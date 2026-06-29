@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Garden Care Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
             --bg-color: #0f1115;
@@ -88,7 +89,7 @@
         }
         .cam-container img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; display: none; border-radius: 6px; }
 
-        .scan-status { color: var(--warning-color); font-weight: bold; text-align: center; padding: 10px 0; font-size: 0.95rem; white-space: pre-wrap; }
+        .scan-status { color: var(--warning-color); font-weight: bold; text-align: center; padding: 10px 0; font-size: 0.95rem; }
 
         .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
         .metric-box { background: #161b22; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; }
@@ -102,6 +103,7 @@
         }
 
         .hidden { display: none; }
+        #debugCanvas { width: 100%; max-height: 150px; object-fit: contain; border: 1px solid var(--border-color); margin-top: 10px; border-radius: 6px; }
     </style>
 </head>
 <body>
@@ -133,14 +135,15 @@
 
         <div class="cam-container" onclick="document.getElementById('nativeCamInput').click()">
             📸 TAP TO SCAN MONITOR FACE
-            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="hidden" onchange="processAIVision(this)">
+            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="hidden" onchange="processImageWithCVFilters(this)">
             <img id="capturePreview" alt="Capture Preview">
+            <canvas id="debugCanvas" class="hidden"></canvas>
         </div>
 
         <div id="scanStatusIndicator" class="scan-status hidden"></div>
 
         <div id="resultsBlock" class="hidden">
-            <div class="section-title" style="margin: 0; color: #ffffff;">📊 AI Extracted Matrix</div>
+            <div class="section-title" style="margin: 0; color: #ffffff;">📊 Filtered Monitor Matrix</div>
             <div class="metric-grid">
                 <div class="metric-box"><span>Moisture</span><strong id="outMoist">--</strong></div>
                 <div class="metric-box"><span>Fertility</span><strong id="outFert">--</strong></div>
@@ -203,8 +206,6 @@
 
     let activeID = null;
     let computedMetrics = null;
-    // Hardcoded production API link to completely drop the config layout requirement
-    const masterRoutingKey = "AIzaSyBYi9ljHKr6UMSYblz-7m-agqhEgmZJmsw";
 
     function buildDashboard() {
         const attentionBox = document.getElementById('attentionContainer');
@@ -243,12 +244,13 @@
         });
     }
 
-    function processAIVision(input) {
+    // CLIENT-SIDE IMAGE CONTRAST PROCESSING PIPELINE
+    function processImageWithCVFilters(input) {
         const file = input.files[0];
         if(!file) return;
 
         const statusBox = document.getElementById('scanStatusIndicator');
-        statusBox.innerText = "⚡ Uploading screen matrix directly to Gemini Core...";
+        statusBox.innerText = "⚡ Running Matrix Preprocessing Filters...";
         statusBox.classList.remove('hidden');
         document.getElementById('resultsBlock').classList.add('hidden');
 
@@ -259,129 +261,37 @@
                 const canvas = document.getElementById('scaleCanvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Compress payload size slightly to ensure fast cellular network transit
-                const maxDim = 800;
-                let w = img.width;
-                let h = img.height;
-                if(w > h && w > maxDim) { h *= maxDim / w; w = maxDim; }
-                else if(h > maxDim) { w *= maxDim / h; h = maxDim; }
-
-                canvas.width = w;
-                canvas.height = h;
-                ctx.drawImage(img, 0, 0, w, h);
+                // Scale target frame geometry
+                const targetWidth = 600;
+                const targetHeight = (img.height / img.width) * targetWidth;
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
                 
-                const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-                document.getElementById('capturePreview').src = dataURL;
-                document.getElementById('capturePreview').style.display = 'block';
+                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                
+                // Apply adaptive high-pass binary threshold filter (Simulating OpenCV backend script)
+                const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+                const data = imgData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i+1];
+                    const b = data[i+2];
+                    
+                    // Isolate dark segments from the dominant green backlighting spectrum
+                    const grayscale = 0.299 * r + 0.587 * g + 0.114 * b;
+                    const isDarkSegment = grayscale < 110 ? 0 : 255;
+                    
+                    data[i] = isDarkSegment;
+                    data[i+1] = isDarkSegment;
+                    data[i+2] = isDarkSegment;
+                }
+                ctx.putImageData(imgData, 0, 0);
 
-                const rawB64 = dataURL.split(',')[1];
-                sendToProductionAPI(rawB64);
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
+                const processedDataURL = canvas.toDataURL('image/jpeg');
+                const debugCanvas = document.getElementById('debugCanvas');
+                debugCanvas.src = processedDataURL;
+                
+                statusBox.innerText = "🔍 Resolving Screen Matrix Segments...";
 
-    // STABLE PRODUCTION WORKFLOW PIPELINE
-    async function sendToProductionAPI(base64Data) {
-        const statusBox = document.getElementById('scanStatusIndicator');
-        try {
-            const prompt = `This is a photo of an intelligent soil detector screen. 
-            Analyze the screen layout completely. Ignore shadow glare. Find the rows for Fertility, Moisture, PH, and Temp.
-            Output ONLY a clean JSON string with no backticks or markdown, matching this exact template format:
-            {"moisture": 57, "fertility": 502, "ph": 6.5, "temperature": 98.4}`;
-
-            // Updated destination endpoint to standard v1 framework to clear region restrictions
-            const endpoint = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${masterRoutingKey}`;
-
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-                        ]
-                    }]
-                })
-            });
-
-            const json = await response.json();
-            
-            if (json.error) {
-                throw new Error(`Cloud Pipeline Status (${json.error.status}): ${json.error.message}`);
-            }
-
-            let textOut = json.candidates[0].content.parts[0].text;
-            // Clear any lingering string format artifacts
-            textOut = textOut.replace(/```json/g, '').replace(/```/g, '').trim();
-            
-            const parsed = JSON.parse(textOut);
-            computedMetrics = {
-                moisture: parseInt(parsed.moisture),
-                fertility: parseInt(parsed.fertility),
-                ph: parseFloat(parsed.ph),
-                temp: parseFloat(parsed.temperature)
-            };
-
-            document.getElementById('outMoist').innerText = computedMetrics.moisture + '%';
-            document.getElementById('outFert').innerText = computedMetrics.fertility + ' µs/cm';
-            document.getElementById('outPH').innerText = computedMetrics.ph;
-            document.getElementById('outTemp').innerText = computedMetrics.temp + '°F';
-
-            statusBox.classList.add('hidden');
-            document.getElementById('resultsBlock').classList.remove('hidden');
-
-        } catch (err) {
-            console.error(err);
-            statusBox.innerText = `❌ AI Engine Sync Error:\n${err.message}\n\nRetake photo with closer, square alignment.`;
-        }
-    }
-
-    function commitLoggedMatrix() {
-        if(computedMetrics) {
-            localStorage.setItem('log_' + activeID, JSON.stringify({
-                moisture: computedMetrics.moisture,
-                fertility: computedMetrics.fertility,
-                ph: computedMetrics.ph,
-                temperature: computedMetrics.temp,
-                timestamp: new Date().toISOString()
-            }));
-            goHome();
-        }
-    }
-
-    function loadPlantForm(id) {
-        activeID = id;
-        const plant = plantDatabase[id];
-        document.getElementById('homeView').classList.add('hidden');
-        document.getElementById('plantView').classList.remove('hidden');
-        document.getElementById('homeBtn').classList.remove('hidden');
-        
-        document.getElementById('headerTitle').innerText = "AI Lens Scan";
-        document.getElementById('plantName').innerText = plant.name;
-        document.getElementById('plantIdBadge').innerText = id;
-        document.getElementById('plantMeta').innerText = plant.stage + ' · ' + plant.loc;
-
-        document.getElementById('nativeCamInput').value = "";
-        document.getElementById('capturePreview').style.display = 'none';
-        document.getElementById('resultsBlock').classList.add('hidden');
-        document.getElementById('scanStatusIndicator').classList.add('hidden');
-        computedMetrics = null;
-    }
-
-    function goHome() {
-        activeID = null;
-        document.getElementById('plantView').classList.add('hidden');
-        document.getElementById('homeView').classList.remove('hidden');
-        document.getElementById('homeBtn').classList.add('hidden');
-        document.getElementById('headerTitle').innerText = "Garden Care Tracker";
-        window.history.replaceState({}, '', window.location.pathname);
-        buildDashboard();
-    }
-
-    buildDashboard();
-</script>
-</body>
-</html>
+                Tesseract.recognize(processedDataURL, 'eng', {
+                    tessedit_char_whitelist: '0123456789.%°fFpHphFerMo
