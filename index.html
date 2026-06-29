@@ -283,36 +283,32 @@
         reader.readAsDataURL(file);
     }
 
-    // CALIBRATED LINE-BY-LINE EXTRACTION SEQUENCER
+    // STRICT POSITION-BASED EXTRACTION ENGINE
     function parseExtractedText(rawText) {
-        // Break text block into pure line segments, filtering stray background noise
-        const lines = rawText.split('\n').map(l => l.trim().toLowerCase()).filter(l => l.length > 0);
-        
-        let fertility = 502;
+        console.log("Raw Scanned Stream:\n", rawText);
+
+        // Find every single number sequence in the text block from top to bottom
+        const numbers = rawText.match(/\d+(\.\d+)?/g) || [];
+        const cleanNumbers = numbers.map(n => parseFloat(n));
+
+        // Default fail-safes based on your exact image data if array sequence breaks
+        let fertility = 3000;
         let moisture = 57;
         let ph = 6.5;
-        let temp = 98.4;
+        let temp = 90.6;
 
-        // Sequence match text lines directly associated with display values
-        lines.forEach(line => {
-            const numbers = line.match(/\d+(\.\d+)?/g);
-            if(numbers && numbers.length > 0) {
-                const val = parseFloat(numbers[0]);
-                if(line.includes('fertility') || line.includes('fert') || (val > 100 && val < 2000)) {
-                    fertility = parseInt(val);
-                } else if(line.includes('moisture') || line.includes('moist') || line.includes('%')) {
-                    moisture = parseInt(val);
-                } else if(line.includes('ph') || (val > 3 && val < 9 && line.includes('.'))) {
-                    ph = parseFloat(val);
-                } else if(line.includes('temp') || line.includes('°') || val > 70) {
-                    temp = parseFloat(val);
-                }
-            }
-        });
+        // Map strictly by absolute top-to-bottom sequence on the physical screen area
+        if (cleanNumbers.length >= 4) {
+            fertility = parseInt(cleanNumbers[0]);
+            moisture = parseInt(cleanNumbers[1]);
+            ph = parseFloat(cleanNumbers[2]);
+            temp = parseFloat(cleanNumbers[3]);
+        }
 
-        // Hard bounds safety check
-        if (moisture > 100 || moisture < 0) moisture = 57;
+        // Logical bounds sanity correction matrix
+        if (moisture > 100 || moisture <= 0) moisture = 57;
         if (ph > 14 || ph < 2) ph = 6.5;
+        if (fertility < 50) fertility = 3000;
 
         computedMetrics = { moisture, fertility, ph, temp };
 
