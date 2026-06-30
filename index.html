@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Garden Care Tracker</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
             --bg-color: #0f1115;
@@ -73,9 +72,9 @@
         .plant-item.alert-border { border-left: 4px solid var(--alert-color); }
         .plant-item.healthy-border { border-left: 4px solid var(--accent-color); }
 
-        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; }
-        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
-        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; }
+        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; color: #ffffff; text-align: left; }
+        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); text-align: left; }
+        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; text-align: left; }
 
         .badge {
             background-color: #30363d; padding: 4px 8px; border-radius: 6px;
@@ -96,14 +95,19 @@
         .metric-box span { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
         .metric-box strong { font-size: 1.3rem; color: var(--accent-color); font-family: monospace; }
 
+        .manual-input-box {
+            margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color);
+        }
+        .manual-input-box label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; text-align: left; text-transform: uppercase; }
+        .manual-input-box input { width: 100%; padding: 10px; background: #161b22; border: 1px solid var(--border-color); border-radius: 6px; color: white; box-sizing: border-box; margin-bottom: 12px; font-size: 1rem; }
+
         button.btn-submit {
             width: 100%; background-color: var(--accent-color); color: white;
             border: none; padding: 14px; border-radius: 8px;
             font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 20px;
         }
 
-        .hidden { display: none; }
-        #debugCanvas { width: 100%; max-height: 150px; object-fit: contain; border: 1px solid var(--border-color); margin-top: 10px; border-radius: 6px; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -134,29 +138,34 @@
         </div>
 
         <div class="cam-container" onclick="document.getElementById('nativeCamInput').click()">
-            📸 TAP TO SCAN MONITOR FACE
-            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="hidden" onchange="processImageWithCVFilters(this)">
+            📸 TAP TO LOG MONITOR VALUES
+            <input type="file" id="nativeCamInput" accept="image/*" class="hidden" onchange="triggerFallbackProcessing(this)">
             <img id="capturePreview" alt="Capture Preview">
-            <canvas id="debugCanvas" class="hidden"></canvas>
         </div>
 
         <div id="scanStatusIndicator" class="scan-status hidden"></div>
 
-        <div id="resultsBlock" class="hidden">
-            <div class="section-title" style="margin: 0; color: #ffffff;">📊 Filtered Monitor Matrix</div>
-            <div class="metric-grid">
-                <div class="metric-box"><span>Moisture</span><strong id="outMoist">--</strong></div>
-                <div class="metric-box"><span>Fertility</span><strong id="outFert">--</strong></div>
-                <div class="metric-box"><span>Soil pH</span><strong id="outPH">--</strong></div>
-                <div class="metric-box"><span>Temperature</span><strong id="outTemp">--</strong></div>
+        <div id="resultsBlock">
+            <div class="section-title" style="margin: 0; color: #ffffff;">📊 Log Matrix Values</div>
+            
+            <div class="manual-input-box">
+                <label>Moisture (%)</label>
+                <input type="number" id="manualMoist" placeholder="e.g. 57" oninput="syncManualMetrics()">
+                
+                <label>Fertility (µs/cm)</label>
+                <input type="number" id="manualFert" placeholder="e.g. 502" oninput="syncManualMetrics()">
+                
+                <label>Soil pH</label>
+                <input type="number" step="0.1" id="manualPH" placeholder="e.g. 6.5" oninput="syncManualMetrics()">
+                
+                <label>Temperature (°F)</label>
+                <input type="number" step="0.1" id="manualTemp" placeholder="e.g. 98.4" oninput="syncManualMetrics()">
             </div>
             
-            <button id="commitBtn" class="btn-submit" onclick="commitLoggedMatrix()">Commit Scanned Metrics To Log</button>
+            <button id="commitBtn" class="btn-submit" onclick="commitLoggedMatrix()">Commit Metrics To Log</button>
         </div>
     </div>
 </div>
-
-<canvas id="scaleCanvas" style="display: none;"></canvas>
 
 <script>
     const plantDatabase = {
@@ -205,36 +214,42 @@
     };
 
     let activeID = null;
-    let computedMetrics = null;
+    let computedMetrics = { moisture: 0, fertility: 0, ph: 7.0, temp: 75.0 };
 
     function buildDashboard() {
-        const attentionBox = document.getElementById('attentionContainer');
-        const stableBox = document.getElementById('stableContainer');
-        attentionBox.innerHTML = '';
-        stableBox.innerHTML = '';
-
-        Object.keys(plantDatabase).forEach(id => {
-            const plant = plantDatabase[id];
-            const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
+        try {
+            const attentionBox = document.getElementById('attentionContainer');
+            const stableBox = document.getElementById('stableContainer');
+            if (!attentionBox || !stableBox) return;
             
-            let isAlert = false;
-            let subText = "No records logged yet.";
-            
-            if(log) {
-                subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
-                if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
-            } else {
-                isAlert = true;
-            }
+            attentionBox.innerHTML = '';
+            stableBox.innerHTML = '';
 
-            const card = document.createElement('div');
-            card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
-            card.onclick = function() { loadPlantForm(id); };
-            card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
-            card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
+            Object.keys(plantDatabase).forEach(id => {
+                const plant = plantDatabase[id];
+                const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
+                
+                let isAlert = false;
+                let subText = "No records logged yet.";
+                
+                if(log) {
+                    subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
+                    if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
+                } else {
+                    isAlert = true;
+                }
 
-            if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
-        });
+                const card = document.createElement('div');
+                card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
+                card.onclick = function() { loadPlantForm(id); };
+                card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
+                card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
+
+                if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
+            });
+        } catch (e) {
+            console.error("Dashboard error caught gracefully: ", e);
+        }
     }
 
     function filterPlants() {
@@ -244,54 +259,81 @@
         });
     }
 
-    // CLIENT-SIDE IMAGE CONTRAST PROCESSING PIPELINE
-    function processImageWithCVFilters(input) {
+    function triggerFallbackProcessing(input) {
         const file = input.files[0];
         if(!file) return;
 
-        const statusBox = document.getElementById('scanStatusIndicator');
-        statusBox.innerText = "⚡ Running Matrix Preprocessing Filters...";
-        statusBox.classList.remove('hidden');
-        document.getElementById('resultsBlock').classList.add('hidden');
-
         const reader = new FileReader();
         reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.getElementById('scaleCanvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Scale target frame geometry
-                const targetWidth = 600;
-                const targetHeight = (img.height / img.width) * targetWidth;
-                canvas.width = targetWidth;
-                canvas.height = targetHeight;
-                
-                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                
-                // Apply adaptive high-pass binary threshold filter (Simulating OpenCV backend script)
-                const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
-                const data = imgData.data;
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i+1];
-                    const b = data[i+2];
-                    
-                    // Isolate dark segments from the dominant green backlighting spectrum
-                    const grayscale = 0.299 * r + 0.587 * g + 0.114 * b;
-                    const isDarkSegment = grayscale < 110 ? 0 : 255;
-                    
-                    data[i] = isDarkSegment;
-                    data[i+1] = isDarkSegment;
-                    data[i+2] = isDarkSegment;
-                }
-                ctx.putImageData(imgData, 0, 0);
+            const img = document.getElementById('capturePreview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
 
-                const processedDataURL = canvas.toDataURL('image/jpeg');
-                const debugCanvas = document.getElementById('debugCanvas');
-                debugCanvas.src = processedDataURL;
-                
-                statusBox.innerText = "🔍 Resolving Screen Matrix Segments...";
+    function syncManualMetrics() {
+        computedMetrics = {
+            moisture: parseInt(document.getElementById('manualMoist').value) || 0,
+            fertility: parseInt(document.getElementById('manualFert').value) || 0,
+            ph: parseFloat(document.getElementById('manualPH').value) || 7.0,
+            temp: parseFloat(document.getElementById('manualTemp').value) || 75.0
+        };
+    }
 
-                Tesseract.recognize(processedDataURL, 'eng', {
-                    tessedit_char_whitelist: '0123456789.%°fFpHphFerMo
+    function commitLoggedMatrix() {
+        if(activeID) {
+            syncManualMetrics();
+            localStorage.setItem('log_' + activeID, JSON.stringify({
+                moisture: computedMetrics.moisture,
+                fertility: computedMetrics.fertility,
+                ph: computedMetrics.ph,
+                temperature: computedMetrics.temp,
+                timestamp: new Date().toISOString()
+            }));
+            goHome();
+        }
+    }
+
+    function loadPlantForm(id) {
+        activeID = id;
+        const plant = plantDatabase[id];
+        document.getElementById('homeView').classList.add('hidden');
+        document.getElementById('plantView').classList.remove('hidden');
+        document.getElementById('homeBtn').classList.remove('hidden');
+        
+        document.getElementById('headerTitle').innerText = "Update Metrics";
+        document.getElementById('plantName').innerText = plant.name;
+        document.getElementById('plantIdBadge').innerText = id;
+        document.getElementById('plantMeta').innerText = plant.stage + ' · ' + plant.loc;
+
+        const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
+        document.getElementById('manualMoist').value = log ? log.moisture : "";
+        document.getElementById('manualFert').value = log ? log.fertility : "";
+        document.getElementById('manualPH').value = log ? log.ph : "";
+        document.getElementById('manualTemp').value = log ? log.temperature : "";
+
+        document.getElementById('nativeCamInput').value = "";
+        document.getElementById('capturePreview').style.display = 'none';
+        
+        syncManualMetrics();
+    }
+
+    function goHome() {
+        activeID = null;
+        document.getElementById('plantView').classList.add('hidden');
+        document.getElementById('homeView').classList.remove('hidden');
+        document.getElementById('homeBtn').classList.add('hidden');
+        document.getElementById('headerTitle').innerText = "Garden Care Tracker";
+        window.history.replaceState({}, '', window.location.pathname);
+        buildDashboard();
+    }
+
+    // Direct, unblocked execution entry
+    window.onload = function() {
+        buildDashboard();
+    };
+    buildDashboard();
+</script>
+</body>
+</html>
