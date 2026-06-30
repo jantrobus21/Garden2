@@ -90,11 +90,6 @@
 
         .scan-status { color: var(--warning-color); font-weight: bold; text-align: center; padding: 10px 0; font-size: 0.95rem; }
 
-        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
-        .metric-box { background: #161b22; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; }
-        .metric-box span { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-        .metric-box strong { font-size: 1.3rem; color: var(--accent-color); font-family: monospace; }
-
         .manual-input-box {
             margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color);
         }
@@ -139,7 +134,7 @@
 
         <div class="cam-container" onclick="document.getElementById('nativeCamInput').click()">
             📸 TAP TO LOG MONITOR VALUES
-            <input type="file" id="nativeCamInput" accept="image/*" class="hidden" onchange="triggerFallbackProcessing(this)">
+            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="hidden" onchange="triggerFallbackProcessing(this)">
             <img id="capturePreview" alt="Capture Preview">
         </div>
 
@@ -248,7 +243,7 @@
                 if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
             });
         } catch (e) {
-            console.error("Dashboard error caught gracefully: ", e);
+            console.error("Dashboard error: ", e);
         }
     }
 
@@ -329,7 +324,6 @@
         buildDashboard();
     }
 
-    // Direct, unblocked execution entry
     window.onload = function() {
         buildDashboard();
     };
