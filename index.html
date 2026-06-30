@@ -71,9 +71,9 @@
         .plant-item.alert-border { border-left: 4px solid var(--alert-color); }
         .plant-item.healthy-border { border-left: 4px solid var(--accent-color); }
 
-        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; color: #ffffff; }
-        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
-        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; }
+        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; color: #ffffff; text-align: left; }
+        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); text-align: left; }
+        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; text-align: left; }
 
         .badge {
             background-color: #30363d; padding: 4px 8px; border-radius: 6px;
@@ -81,7 +81,7 @@
         }
 
         .manual-input-box { margin-top: 5px; }
-        .manual-input-box label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+        .manual-input-box label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; text-align: left; }
         .manual-input-box input { width: 100%; padding: 12px; background: #161b22; border: 1px solid var(--border-color); border-radius: 6px; color: white; box-sizing: border-box; margin-bottom: 15px; font-size: 1.05rem; }
 
         button.btn-submit {
@@ -200,6 +200,7 @@
 
         Object.keys(plantDatabase).forEach(id => {
             const plant = plantDatabase[id];
+            // Fixed key alignment mismatch back to standard format
             const log = JSON.parse(localStorage.getItem('plant_log_' + id)) || null;
             
             let isAlert = false;
@@ -282,8 +283,11 @@
         buildDashboard();
     }
 
-    // Direct initialization
-    buildDashboard();
+    // Direct event mounting fallback
+    document.addEventListener("DOMContentLoaded", buildDashboard);
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+        buildDashboard();
+    }
 </script>
 </body>
 </html>
