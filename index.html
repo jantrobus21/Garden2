@@ -191,36 +191,43 @@
     let activeID = null;
 
     function buildDashboard() {
-        const attentionBox = document.getElementById('attentionContainer');
-        const stableBox = document.getElementById('stableContainer');
-        if (!attentionBox || !stableBox) return;
-        
-        attentionBox.innerHTML = '';
-        stableBox.innerHTML = '';
-
-        Object.keys(plantDatabase).forEach(id => {
-            const plant = plantDatabase[id];
-            // Fixed key alignment mismatch back to standard format
-            const log = JSON.parse(localStorage.getItem('plant_log_' + id)) || null;
+        try {
+            const attentionBox = document.getElementById('attentionContainer');
+            const stableBox = document.getElementById('stableContainer');
+            if (!attentionBox || !stableBox) return;
             
-            let isAlert = false;
-            let subText = "No records logged yet.";
-            
-            if(log) {
-                subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
-                if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
-            } else {
-                isAlert = true;
-            }
+            attentionBox.innerHTML = '';
+            stableBox.innerHTML = '';
 
-            const card = document.createElement('div');
-            card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
-            card.onclick = function() { loadPlantForm(id); };
-            card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
-            card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
+            Object.keys(plantDatabase).forEach(id => {
+                const plant = plantDatabase[id];
+                let log = null;
+                
+                try {
+                    log = JSON.parse(localStorage.getItem('plant_log_' + id));
+                } catch(e) { console.error(e); }
+                
+                let isAlert = false;
+                let subText = "No records logged yet.";
+                
+                if(log) {
+                    subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
+                    if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
+                } else {
+                    isAlert = true;
+                }
 
-            if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
-        });
+                const card = document.createElement('div');
+                card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
+                card.onclick = function() { loadPlantForm(id); };
+                card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
+                card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
+
+                if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
+            });
+        } catch (err) {
+            console.error("Dashboard failed to construct: ", err);
+        }
     }
 
     function filterPlants() {
@@ -251,7 +258,10 @@
             timestamp: new Date().toISOString()
         };
 
-        localStorage.setItem('plant_log_' + activeID, JSON.stringify(dataPayload));
+        try {
+            localStorage.setItem('plant_log_' + activeID, JSON.stringify(dataPayload));
+        } catch(e) { console.error(e); }
+        
         goHome();
     }
 
@@ -267,7 +277,11 @@
         document.getElementById('plantIdBadge').innerText = id;
         document.getElementById('plantMeta').innerText = plant.stage + ' · ' + plant.loc;
 
-        const log = JSON.parse(localStorage.getItem('plant_log_' + id)) || null;
+        let log = null;
+        try {
+            log = JSON.parse(localStorage.getItem('plant_log_' + id));
+        } catch(e) { console.error(e); }
+
         document.getElementById('manualMoist').value = log ? log.moisture : "";
         document.getElementById('manualFert').value = log ? log.fertility : "";
         document.getElementById('manualPH').value = log ? log.ph : "";
@@ -283,11 +297,11 @@
         buildDashboard();
     }
 
-    // Direct event mounting fallback
-    document.addEventListener("DOMContentLoaded", buildDashboard);
-    if (document.readyState === "interactive" || document.readyState === "complete") {
+    // Unbreakable absolute initialization queue
+    document.addEventListener("DOMContentLoaded", function() {
         buildDashboard();
-    }
+    });
+    setTimeout(buildDashboard, 100);
 </script>
 </body>
 </html>
