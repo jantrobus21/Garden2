@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -13,11 +13,10 @@
             --text-muted: #8b949e;
             --border-color: #30363d;
             --alert-color: #f85149;
-            --warning-color: #ffb300;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
@@ -34,13 +33,13 @@
             position: relative;
         }
 
-        h1 { margin: 0; font-size: 1.4rem; color: #ffffff; font-weight: 600; letter-spacing: -0.5px; }
+        h1 { margin: 0; font-size: 1.4rem; color: #ffffff; font-weight: 600; }
         
         .home-btn {
             position: absolute; left: 0; top: 15px;
-            background: none; border: 1px solid var(--border-color);
+            background: #21262d; border: 1px solid var(--border-color);
             color: var(--text-color); padding: 5px 10px; border-radius: 6px;
-            cursor: pointer; font-size: 0.85rem; background-color: #21262d;
+            cursor: pointer; font-size: 0.85rem;
         }
 
         .card {
@@ -51,7 +50,7 @@
 
         .section-title {
             font-size: 1rem; font-weight: 600; margin: 20px 0 10px 0;
-            display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
         .search-box {
@@ -72,51 +71,17 @@
         .plant-item.alert-border { border-left: 4px solid var(--alert-color); }
         .plant-item.healthy-border { border-left: 4px solid var(--accent-color); }
 
-        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; color: #ffffff; text-align: left; }
-        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); text-align: left; }
-        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; text-align: left; }
+        .plant-info h3 { margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600; color: #ffffff; }
+        .plant-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+        .status-summary { font-size: 0.8rem; font-weight: bold; margin-top: 4px; }
 
         .badge {
             background-color: #30363d; padding: 4px 8px; border-radius: 6px;
             font-size: 0.75rem; color: #c9d1d9; font-weight: bold; font-family: monospace;
         }
 
-        .cam-box {
-            background-color: #161b22;
-            border: 1px solid var(--border-color);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .cam-box label {
-            display: block;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        /* Naked standard button style for unblocked OS permission access */
-        .native-file-input {
-            width: 100%;
-            color: white;
-            background: #21262d;
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 0.95rem;
-        }
-
-        .cam-box img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; display: none; border-radius: 6px; border: 1px solid var(--border-color); }
-
-        .manual-input-box {
-            margin-top: 5px; padding-top: 15px; border-top: 1px dashed var(--border-color);
-        }
-        .manual-input-box label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; text-align: left; text-transform: uppercase; }
+        .manual-input-box { margin-top: 5px; }
+        .manual-input-box label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
         .manual-input-box input { width: 100%; padding: 12px; background: #161b22; border: 1px solid var(--border-color); border-radius: 6px; color: white; box-sizing: border-box; margin-bottom: 15px; font-size: 1.05rem; }
 
         button.btn-submit {
@@ -155,30 +120,24 @@
             <span id="plantIdBadge" class="badge">P0000</span>
         </div>
 
-        <div class="cam-box">
-            <label for="nativeCamInput">📸 Take Photo / Select Image</label>
-            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="native-file-input" onchange="triggerFallbackProcessing(this)">
-            <img id="capturePreview" alt="Capture Preview">
-        </div>
-
         <div id="resultsBlock">
-            <div class="section-title" style="margin: 0; color: #ffffff; padding-bottom: 5px;">📊 Matrix Metrics</div>
+            <div class="section-title" style="margin: 0; color: #ffffff; padding-bottom: 10px;">📊 Input Profile Metrics</div>
             
             <div class="manual-input-box">
                 <label>Moisture (%)</label>
-                <input type="number" id="manualMoist" placeholder="e.g. 57" oninput="syncManualMetrics()">
+                <input type="number" id="manualMoist" placeholder="Enter value">
                 
                 <label>Fertility (µs/cm)</label>
-                <input type="number" id="manualFert" placeholder="e.g. 502" oninput="syncManualMetrics()">
+                <input type="number" id="manualFert" placeholder="Enter value">
                 
                 <label>Soil pH</label>
-                <input type="number" step="0.1" id="manualPH" placeholder="e.g. 6.5" oninput="syncManualMetrics()">
+                <input type="number" step="0.1" id="manualPH" placeholder="Enter value">
                 
                 <label>Temperature (°F)</label>
-                <input type="number" step="0.1" id="manualTemp" placeholder="e.g. 98.4" oninput="syncManualMetrics()">
+                <input type="number" step="0.1" id="manualTemp" placeholder="Enter value">
             </div>
             
-            <button id="commitBtn" class="btn-submit" onclick="commitLoggedMatrix()">Commit Metrics To Log</button>
+            <button id="commitBtn" class="btn-submit" onclick="executeDataCommit()">Commit Metrics To Log</button>
         </div>
     </div>
 </div>
@@ -230,7 +189,6 @@
     };
 
     let activeID = null;
-    let computedMetrics = { moisture: 0, fertility: 0, ph: 7.0, temp: 75.0 };
 
     function buildDashboard() {
         const attentionBox = document.getElementById('attentionContainer');
@@ -242,7 +200,7 @@
 
         Object.keys(plantDatabase).forEach(id => {
             const plant = plantDatabase[id];
-            const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
+            const log = JSON.parse(localStorage.getItem('plant_log_' + id)) || null;
             
             let isAlert = false;
             let subText = "No records logged yet.";
@@ -271,40 +229,29 @@
         });
     }
 
-    function triggerFallbackProcessing(input) {
-        const file = input.files[0];
-        if(!file) return;
+    function executeDataCommit() {
+        if (!activeID) return;
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.getElementById('capturePreview');
-            img.src = e.target.result;
-            img.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    }
+        const mVal = document.getElementById('manualMoist').value;
+        const fVal = document.getElementById('manualFert').value;
+        const pVal = document.getElementById('manualPH').value;
+        const tVal = document.getElementById('manualTemp').value;
 
-    function syncManualMetrics() {
-        computedMetrics = {
-            moisture: parseInt(document.getElementById('manualMoist').value) || 0,
-            fertility: parseInt(document.getElementById('manualFert').value) || 0,
-            ph: parseFloat(document.getElementById('manualPH').value) || 7.0,
-            temp: parseFloat(document.getElementById('manualTemp').value) || 75.0
-        };
-    }
-
-    function commitLoggedMatrix() {
-        if(activeID) {
-            syncManualMetrics();
-            localStorage.setItem('log_' + activeID, JSON.stringify({
-                moisture: computedMetrics.moisture,
-                fertility: computedMetrics.fertility,
-                ph: computedMetrics.ph,
-                temperature: computedMetrics.temp,
-                timestamp: new Date().toISOString()
-            }));
-            goHome();
+        if (mVal === "" || fVal === "" || pVal === "" || tVal === "") {
+            alert("All fields must be filled out to commit data.");
+            return;
         }
+
+        const dataPayload = {
+            moisture: parseInt(mVal),
+            fertility: parseInt(fVal),
+            ph: parseFloat(pVal),
+            temperature: parseFloat(tVal),
+            timestamp: new Date().toISOString()
+        };
+
+        localStorage.setItem('plant_log_' + activeID, JSON.stringify(dataPayload));
+        goHome();
     }
 
     function loadPlantForm(id) {
@@ -319,16 +266,11 @@
         document.getElementById('plantIdBadge').innerText = id;
         document.getElementById('plantMeta').innerText = plant.stage + ' · ' + plant.loc;
 
-        const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
+        const log = JSON.parse(localStorage.getItem('plant_log_' + id)) || null;
         document.getElementById('manualMoist').value = log ? log.moisture : "";
         document.getElementById('manualFert').value = log ? log.fertility : "";
         document.getElementById('manualPH').value = log ? log.ph : "";
         document.getElementById('manualTemp').value = log ? log.temperature : "";
-
-        document.getElementById('nativeCamInput').value = "";
-        document.getElementById('capturePreview').style.display = 'none';
-        
-        syncManualMetrics();
     }
 
     function goHome() {
@@ -337,11 +279,10 @@
         document.getElementById('homeView').classList.remove('hidden');
         document.getElementById('homeBtn').classList.add('hidden');
         document.getElementById('headerTitle').innerText = "Garden Care Tracker";
-        window.history.replaceState({}, '', window.location.pathname);
         buildDashboard();
     }
 
-    // Force hard render execution paths immediately on entry
+    // Direct initialization
     buildDashboard();
 </script>
 </body>
