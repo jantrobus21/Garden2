@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -81,24 +81,37 @@
             font-size: 0.75rem; color: #c9d1d9; font-weight: bold; font-family: monospace;
         }
 
-        .camera-button-trigger {
-            width: 100%;
-            background-color: #21262d;
-            color: var(--text-color);
+        .cam-box {
+            background-color: #161b22;
             border: 1px solid var(--border-color);
-            padding: 16px;
+            padding: 15px;
             border-radius: 8px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
-        .cam-container img { width: 100%; max-height: 220px; object-fit: contain; margin-bottom: 15px; display: none; border-radius: 6px; border: 1px solid var(--border-color); }
+        .cam-box label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* Naked standard button style for unblocked OS permission access */
+        .native-file-input {
+            width: 100%;
+            color: white;
+            background: #21262d;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+
+        .cam-box img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; display: none; border-radius: 6px; border: 1px solid var(--border-color); }
 
         .manual-input-box {
             margin-top: 5px; padding-top: 15px; border-top: 1px dashed var(--border-color);
@@ -142,11 +155,9 @@
             <span id="plantIdBadge" class="badge">P0000</span>
         </div>
 
-        <div class="cam-container">
-            <label class="camera-button-trigger">
-                📸 OPEN CAMERA TO LOG PROFILE
-                <input type="file" accept="image/*" capture="environment" style="display: none;" onchange="triggerFallbackProcessing(this)">
-            </label>
+        <div class="cam-box">
+            <label for="nativeCamInput">📸 Take Photo / Select Image</label>
+            <input type="file" id="nativeCamInput" accept="image/*" capture="environment" class="native-file-input" onchange="triggerFallbackProcessing(this)">
             <img id="capturePreview" alt="Capture Preview">
         </div>
 
@@ -222,39 +233,35 @@
     let computedMetrics = { moisture: 0, fertility: 0, ph: 7.0, temp: 75.0 };
 
     function buildDashboard() {
-        try {
-            const attentionBox = document.getElementById('attentionContainer');
-            const stableBox = document.getElementById('stableContainer');
-            if (!attentionBox || !stableBox) return;
+        const attentionBox = document.getElementById('attentionContainer');
+        const stableBox = document.getElementById('stableContainer');
+        if (!attentionBox || !stableBox) return;
+        
+        attentionBox.innerHTML = '';
+        stableBox.innerHTML = '';
+
+        Object.keys(plantDatabase).forEach(id => {
+            const plant = plantDatabase[id];
+            const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
             
-            attentionBox.innerHTML = '';
-            stableBox.innerHTML = '';
+            let isAlert = false;
+            let subText = "No records logged yet.";
+            
+            if(log) {
+                subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
+                if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
+            } else {
+                isAlert = true;
+            }
 
-            Object.keys(plantDatabase).forEach(id => {
-                const plant = plantDatabase[id];
-                const log = JSON.parse(localStorage.getItem('log_' + id)) || null;
-                
-                let isAlert = false;
-                let subText = "No records logged yet.";
-                
-                if(log) {
-                    subText = 'Moisture: ' + log.moisture + '% · Fertility: ' + log.fertility + ' · pH: ' + log.ph;
-                    if (parseInt(log.moisture) < plant.minMoist) { isAlert = true; subText += " ⚠️ LOW MOISTURE"; }
-                } else {
-                    isAlert = true;
-                }
+            const card = document.createElement('div');
+            card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
+            card.onclick = function() { loadPlantForm(id); };
+            card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
+            card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
 
-                const card = document.createElement('div');
-                card.className = 'plant-item ' + (isAlert ? 'alert-border' : 'healthy-border');
-                card.onclick = function() { loadPlantForm(id); };
-                card.setAttribute('data-search', id + ' ' + plant.name.toLowerCase() + ' ' + plant.loc.toLowerCase());
-                card.innerHTML = '<div class="plant-info"><h3>' + plant.name + '</h3><p>' + plant.stage + ' · ' + plant.loc + '</p><div class="status-summary" style="color:' + (isAlert ? '#ff5252':'#4caf50') + '">' + subText + '</div></div><span class="badge">' + id + '</span>';
-
-                if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
-            });
-        } catch (e) {
-            console.error("Dashboard error: ", e);
-        }
+            if(isAlert) { attentionBox.appendChild(card); } else { stableBox.appendChild(card); }
+        });
     }
 
     function filterPlants() {
@@ -318,6 +325,7 @@
         document.getElementById('manualPH').value = log ? log.ph : "";
         document.getElementById('manualTemp').value = log ? log.temperature : "";
 
+        document.getElementById('nativeCamInput').value = "";
         document.getElementById('capturePreview').style.display = 'none';
         
         syncManualMetrics();
@@ -333,9 +341,7 @@
         buildDashboard();
     }
 
-    window.onload = function() {
-        buildDashboard();
-    };
+    // Force hard render execution paths immediately on entry
     buildDashboard();
 </script>
 </body>
